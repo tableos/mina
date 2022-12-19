@@ -1,0 +1,1 @@
+Download `ggml.h`, `ggml.c`, `whisper.h`, `whisper.cpp`, `ggml-model-whisper-tiny.en.bin` to this directory and run `npm i` to setup, then `npm start` to launch the app.

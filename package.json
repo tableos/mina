@@ -1,0 +1,20 @@
+{
+  "name": "mina",
+  "version": "0.0.0",
+  "description": "Node.js Addons Example #9",
+  "main": "addon.js",
+  "private": true,
+  "gypfile": true,
+  "scripts": {
+    "start": "electron main.js",
+    "test": "node addon.js"
+  },
+  "dependencies": {
+    "bindings": "*",
+    "electron": "^22.0.0",
+    "node-addon-api": "*"
+  },
+  "devDependencies": {
+    "eslint": "^8.30.0"
+  }
+}
