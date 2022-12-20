@@ -2,12 +2,14 @@
   "name": "mina",
   "version": "0.0.0",
   "description": "Node.js Addons Example #9",
-  "main": "addon.js",
+  "main": "test.js",
   "private": true,
   "gypfile": true,
   "scripts": {
-    "start": "electron main.js",
-    "test": "node addon.js"
+    "start": "electron src/main.js",
+    "build": "npm install",
+    "build-verbose": "npm install --verbose",
+    "test": "node test.js"
   },
   "dependencies": {
     "bindings": "*",
@@ -15,6 +17,7 @@
     "node-addon-api": "*"
   },
   "devDependencies": {
-    "eslint": "^8.30.0"
+    "eslint": "^8.30.0",
+    "prettier": "^2.8.1"
   }
 }

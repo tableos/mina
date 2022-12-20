@@ -27,41 +27,41 @@ class RecorderProcessor extends AudioWorkletProcessor {
    * @param {Options} options
    */
   constructor(options) {
-    super();
-    log(options);
-    this._createdAt = currentTime;
-    this._elapsed = 0;
+    super()
+    log(options)
+    this._createdAt = currentTime
+    this._elapsed = 0
     this._recordChannelCount =
-      (options.processorOptions && options.processorOptions.channelCount) || 1;
-    this.enable = true;
+      (options.processorOptions && options.processorOptions.channelCount) || 1
+    this.enable = true
     this.port.onmessage = (e) => {
-      if (e.data === "pause") this.enable = false;
-      else if (e.data === "resume") this.enable = true;
-    };
+      if (e.data === 'pause') this.enable = false
+      else if (e.data === 'resume') this.enable = true
+    }
   }
 
   process(inputs, outputs) {
     // Records the incoming data from |inputs| and also bypasses the data to
     // |outputs|.
-    const input = inputs[0];
-    const output = outputs[0];
-    const channelsData = []; // [0] -> channel 0, [1] -> channel 1, ...
+    const input = inputs[0]
+    const output = outputs[0]
+    const channelsData = [] // [0] -> channel 0, [1] -> channel 1, ...
 
     if (!input.length) {
-      log("input length is 0:", input);
-      return true;
+      log('input length is 0:', input)
+      return true
     }
 
     for (let channel = 0; channel < input.length; channel++) {
-      let inputChannel, outputChannel;
+      let inputChannel, outputChannel
       try {
-        inputChannel = input[channel];
-        outputChannel = output[channel];
+        inputChannel = input[channel]
+        outputChannel = output[channel]
         // outputChannel.set(inputChannel);
 
-        if (this.enable) channelsData[channel] = inputChannel.slice();
+        if (this.enable) channelsData[channel] = inputChannel.slice()
       } catch (e) {
-        error(e, { channel, inputs, outputs, input, output });
+        error(e, { channel, inputs, outputs, input, output })
       }
     }
 
@@ -69,10 +69,8 @@ class RecorderProcessor extends AudioWorkletProcessor {
       this.port.postMessage({
         currentFrame,
         sampleRate,
-        recordBuffer: channelsData.map(
-          (floats) => new Float32Array(floats)
-        ),
-      });
+        recordBuffer: channelsData.map((floats) => new Float32Array(floats)),
+      })
     }
 
     /**
@@ -81,16 +79,16 @@ class RecorderProcessor extends AudioWorkletProcessor {
      * From experimenting, this should be `true` otherwise `process` is
      * only called once.
      */
-    return true;
+    return true
   }
 }
 
-registerProcessor("recorder-processor", RecorderProcessor);
+registerProcessor('recorder-processor', RecorderProcessor)
 
 function log(...args) {
-  console.log("recorderWorklet:", ...args);
+  console.log('recorderWorklet:', ...args)
 }
 
 function error(...args) {
-  console.error("recorderWorklet:", ...args);
+  console.error('recorderWorklet:', ...args)
 }
