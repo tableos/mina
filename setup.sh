@@ -1,5 +1,6 @@
 echo "Init whisper.cpp git submodule..."
 git submodule init
+git submodule update
 echo "Installing dependencies and compiling C/C++ native addons..."
 npm install
 echo "Downloading whisper model..."
