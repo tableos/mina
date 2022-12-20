@@ -110,7 +110,7 @@ void RealtimeSttWhisper::Run()
       //     WHISPER_SAMPLE_RATE /* 1 second */
       // );
 
-      pcmf32.resize(n_samples_old + n_samples_new);
+      // pcmf32.resize(n_samples_old + n_samples_new);
 
       // for (int i = 0; i < n_samples_from_old; i++) {
       //   // never moves from smaller indexes to larger ones
