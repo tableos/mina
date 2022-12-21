@@ -119,21 +119,27 @@ void RealtimeSttWhisper::Run()
   wparams.max_tokens = 64;
   wparams.language = "en";
 
-  /* When more than this amount of audio received, run an iteration. Note
-  that since whisper is currently designed to process audio in 30-second
-  chunks even with smaller inputs, the . */
+  /* When more than this amount of audio received, run an iteration. */
   const int trigger_ms = 400;
-  /* When more than this amount of audio accumulates in current context,
-  clear current context and enter a new iteration after this iteration.
-  TODO: Replace with proper VAD (voice activity detection). */
-  const int iter_threshold_ms = 16000;  // why iter usually stop at half?
-  /* The design of trigger and threshold allows inputing audio at different
-  rate without external config. Inspired by Assembly.ai
-  (https://github.com/misraturp/Real-time-transcription-from-microphone/blob/main/speech_recognition.py)
-  */
-
   const int n_samples_trigger = (trigger_ms / 1000.0) * WHISPER_SAMPLE_RATE;
+  /**
+   * When more than this amount of audio accumulates in the audio buffer,
+   * force finalize current audio context and clear the buffer. Note that
+   * VAD may finalize an iteration earlier.
+   */
+  const int iter_threshold_ms = 16000;
   const int n_samples_iter_threshold = (iter_threshold_ms / 1000.0) * WHISPER_SAMPLE_RATE;
+
+  /**
+   * ### Reminders
+   *
+   * - Note that whisper designed to process audio in 30-second chunks, and
+   *   the execution time of processing smaller chunks may not be shorter.
+   * - The design of trigger and threshold allows inputing audio data at
+   *   arbitrary rates with zero config. Inspired by Assembly.ai's
+   *   real-time transcription API
+   *   (https://github.com/misraturp/Real-time-transcription-from-microphone/blob/main/speech_recognition.py)
+   */
 
   /* VAD parameters */
   const int vad_window_s = 3;  // the last 3s
@@ -169,23 +175,10 @@ void RealtimeSttWhisper::Run()
     {
       std::lock_guard<std::mutex> lock(s_mutex);
 
-      const int n_samples_new = s_queued_pcmf32.size();
-      const int n_samples_old = pcmf32.size();
-      // const int n_samples_from_old = std::min(
-      //     n_samples_old /* cannot take more than exisitng */,
-      //     WHISPER_SAMPLE_RATE /* 1 second */
-      // );
-
-      // pcmf32.resize(n_samples_old + n_samples_new);
-
-      // for (int i = 0; i < n_samples_from_old; i++) {
-      //   // never moves from smaller indexes to larger ones
-      //   pcmf32[i] = pcmf32[n_samples_old - n_samples_from_old + i];
-      // }
-
-      // memcpy(pcmf32.data() + n_samples_from_old, s_queued_pcmf32.data(), n_samples_new * sizeof(float));
       pcmf32.insert(pcmf32.end(), s_queued_pcmf32.begin(), s_queued_pcmf32.end());
-      // printf("processing: %d, threshold: %d\n", (int)pcmf32.size(), n_samples_iter_threshold);
+
+      // printf("existing: %d, new: %d, will process: %d, threshold: %d\n",
+      //        n_samples_old, n_samples_new, (int)pcmf32.size(), n_samples_iter_threshold);
 
       // print_array(pcmf32);
 
@@ -209,12 +202,13 @@ void RealtimeSttWhisper::Run()
         msg.text += text;
       }
 
-      bool speech_has_end = false;
 
       /**
        * Simple VAD from the "stream" example in whisper.cpp
        * https://github.com/ggerganov/whisper.cpp/blob/231bebca7deaf32d268a8b207d15aa859e52dbbe/examples/stream/stream.cpp#L378
        */
+      bool speech_has_end = false;
+      
       /* Need enough accumulated audio to do VAD. */
       if ((int)pcmf32.size() >= n_samples_vad_window) {
         std::vector<float> pcmf32_window(pcmf32.end() - n_samples_vad_window, pcmf32.end());
@@ -244,8 +238,6 @@ void RealtimeSttWhisper::Run()
       } else {
         msg.is_partial = true;
       }
-
-      // printf("transcribed: %s\n", msg.text.c_str());
 
       std::lock_guard<std::mutex> lock(s_mutex);
       s_transcribed_msgs.insert(s_transcribed_msgs.end(), std::move(msg));
