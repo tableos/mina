@@ -28,6 +28,7 @@ class RealtimeSttWhisper
   std::mutex s_mutex;  // for accessing shared variables from both main thread and worker thread
   std::thread worker;
   void Run();
+  std::chrono::steady_clock::time_point t_last_iter;
 };
 
 #endif  // STT_WHISPER_H_

@@ -2,6 +2,7 @@
 #include "whisper.h"
 
 #include <atomic>
+#include <cmath>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -16,11 +17,66 @@ void print_array(const std::vector<float>& data)
   fprintf(stdout, " ]\n");
 }
 
+void high_pass_filter(std::vector<float>& data, float cutoff, float sample_rate)
+{
+  const float rc = 1.0f / (2.0f * M_PI * cutoff);
+  const float dt = 1.0f / sample_rate;
+  const float alpha = dt / (rc + dt);
+
+  float y = data[0];
+
+  for (size_t i = 1; i < data.size(); i++) {
+    y = alpha * (y + data[i] - data[i - 1]);
+    data[i] = y;
+  }
+}
+
+/** Check if speech is ending. */
+bool vad_simple(std::vector<float>& pcmf32, int sample_rate, int last_ms, float vad_thold, float freq_thold, bool verbose)
+{
+  const int n_samples = pcmf32.size();
+  const int n_samples_last = (sample_rate * last_ms) / 1000;
+
+  if (n_samples_last >= n_samples) {
+    // not enough samples - assume no speech
+    return false;
+  }
+
+  if (freq_thold > 0.0f) {
+    high_pass_filter(pcmf32, freq_thold, sample_rate);
+  }
+
+  float energy_all = 0.0f;
+  float energy_last = 0.0f;
+
+  for (int i = 0; i < n_samples; i++) {
+    energy_all += fabsf(pcmf32[i]);
+
+    if (i >= n_samples - n_samples_last) {
+      energy_last += fabsf(pcmf32[i]);
+    }
+  }
+
+  energy_all /= n_samples;
+  energy_last /= n_samples_last;
+
+  if (verbose) {
+    fprintf(stderr, "%s: energy_all: %f, energy_last: %f, vad_thold: %f, freq_thold: %f\n", __func__, energy_all, energy_last, vad_thold, freq_thold);
+  }
+
+  if ((energy_all < 0.0001f && energy_last < 0.0001f) || energy_last > vad_thold * energy_all) {
+    return false;
+  }
+
+  return true;
+}
+
 RealtimeSttWhisper::RealtimeSttWhisper(const std::string& path_model)
 {
   ctx = whisper_init(path_model.c_str());
   is_running = true;
   worker = std::thread(&RealtimeSttWhisper::Run, this);
+  t_last_iter = std::chrono::high_resolution_clock::now();
 }
 
 RealtimeSttWhisper::~RealtimeSttWhisper()
@@ -54,13 +110,13 @@ void RealtimeSttWhisper::Run()
 {
   struct whisper_full_params wparams = whisper_full_default_params(whisper_sampling_strategy::WHISPER_SAMPLING_GREEDY);
 
-  // Follow here https://github.com/ggerganov/whisper.cpp/blob/master/examples/stream/stream.cpp#L302
+  // See here for example https://github.com/ggerganov/whisper.cpp/blob/master/examples/stream/stream.cpp#L302
   wparams.n_threads = 4;
   wparams.no_context = true;
   wparams.single_segment = true;
   wparams.print_progress = false;
   wparams.print_timestamps = false;
-  wparams.max_tokens = 32;
+  wparams.max_tokens = 64;
   wparams.language = "en";
 
   /* When more than this amount of audio received, run an iteration. Note
@@ -70,7 +126,7 @@ void RealtimeSttWhisper::Run()
   /* When more than this amount of audio accumulates in current context,
   clear current context and enter a new iteration after this iteration.
   TODO: Replace with proper VAD (voice activity detection). */
-  const int iter_threshold_ms = 8000;
+  const int iter_threshold_ms = 16000;  // why iter usually stop at half?
   /* The design of trigger and threshold allows inputing audio at different
   rate without external config. Inspired by Assembly.ai
   (https://github.com/misraturp/Real-time-transcription-from-microphone/blob/main/speech_recognition.py)
@@ -79,8 +135,18 @@ void RealtimeSttWhisper::Run()
   const int n_samples_trigger = (trigger_ms / 1000.0) * WHISPER_SAMPLE_RATE;
   const int n_samples_iter_threshold = (iter_threshold_ms / 1000.0) * WHISPER_SAMPLE_RATE;
 
+  /* VAD parameters */
+  const int vad_window_s = 3;  // the last 3s
+  const int n_samples_vad_window = WHISPER_SAMPLE_RATE * vad_window_s;
+  const int vad_last_ms = 450;  // will compare the energy of the last 450ms to that of the total 3s
+  const int n_samples_keep_iter = WHISPER_SAMPLE_RATE * 0.1;
+  const float vad_thold = 0.25f;
+  const float freq_thold = 200.0f;
+
+  /* Audio buffer */
   std::vector<float> pcmf32;
 
+  /* Processing loop */
   while (is_running) {
     {
       std::unique_lock<std::mutex> lock(s_mutex);
@@ -143,11 +209,38 @@ void RealtimeSttWhisper::Run()
         msg.text += text;
       }
 
+      bool speech_has_end = false;
 
-      /* Clear context when it exceeds iteration threshold. */
-      if (pcmf32.size() > n_samples_iter_threshold) {
+      /**
+       * Simple VAD from the "stream" example in whisper.cpp
+       * https://github.com/ggerganov/whisper.cpp/blob/231bebca7deaf32d268a8b207d15aa859e52dbbe/examples/stream/stream.cpp#L378
+       */
+      /* Need enough accumulated audio to do VAD. */
+      if ((int)pcmf32.size() >= n_samples_vad_window) {
+        std::vector<float> pcmf32_window(pcmf32.end() - n_samples_vad_window, pcmf32.end());
+        speech_has_end = vad_simple(pcmf32_window, WHISPER_SAMPLE_RATE, vad_last_ms,
+                                    vad_thold, freq_thold, false);
+        if (speech_has_end)
+          printf("speech end detected\n");
+      }
+
+      /**
+       * Clear audio buffer when the size exceeds iteration threshold or
+       * speech end is detected.
+       */
+      if (pcmf32.size() > n_samples_iter_threshold || speech_has_end) {
+        const auto t_now = std::chrono::high_resolution_clock::now();
+        const auto t_diff = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last_iter).count();
+        printf("iter took: %lldms\n", t_diff);
+        t_last_iter = t_now;
+
         msg.is_partial = false;
-        pcmf32.clear();
+        /**
+         * Keep the last few samples in the audio buffer, so the next
+         * iteration has a smoother start.
+         */
+        std::vector<float> last(pcmf32.end() - n_samples_keep_iter, pcmf32.end());
+        pcmf32 = std::move(last);
       } else {
         msg.is_partial = true;
       }
