@@ -6,7 +6,10 @@
 
 /**
  * @typedef ProcessorOptions
- * @property {number} channelCount A channel count to record.
+ * @property {number} channelCount The number of channels to record.
+ * @property {number} reportSize Report data every time this number of
+ * samples are accumulated. Must be >= 128 and recommended to be the
+ * multiple of 128 for zero latency.
  */
 
 /**
@@ -28,12 +31,34 @@ class RecorderProcessor extends AudioWorkletProcessor {
    */
   constructor(options) {
     super()
-    log(options)
-    this._createdAt = currentTime
-    this._elapsed = 0
-    this._recordChannelCount =
-      (options.processorOptions && options.processorOptions.channelCount) || 1
+
     this.enable = true
+
+    const reportSize =
+      options.processorOptions && options.processorOptions.reportSize
+    if (!reportSize || reportSize < 128) {
+      log('reportSize must be >= 128, will be set to 128')
+      this.reportSize = 128
+    } else {
+      this.reportSize = reportSize
+    }
+
+    const recordChannelCount =
+      options.processorOptions && options.processorOptions.channelCount
+    if (!recordChannelCount || recordChannelCount < 1) {
+      log('Must record at least 1 channel, will be set to one channel')
+      this.recordChannelCount = 1
+    } else {
+      this.recordChannelCount = recordChannelCount
+    }
+
+    /** Create buffer for each channel. */
+    /** @type {number[][]} */
+    this.buffer = []
+    for (let i = 0; i < this.recordChannelCount; i++) {
+      this.buffer[i] = []
+    }
+
     this.port.onmessage = (e) => {
       if (e.data === 'pause') this.enable = false
       else if (e.data === 'resume') this.enable = true
@@ -41,36 +66,43 @@ class RecorderProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
-    // Records the incoming data from |inputs| and also bypasses the data to
-    // |outputs|.
-    const input = inputs[0]
-    const output = outputs[0]
-    const channelsData = [] // [0] -> channel 0, [1] -> channel 1, ...
-
-    if (!input.length) {
-      log('input length is 0:', input)
+    if (!this.enable) {
+      this.buffer = this.buffer.map((_) => [])
       return true
     }
 
-    for (let channel = 0; channel < input.length; channel++) {
-      let inputChannel, outputChannel
+    const input = inputs[0]
+    const output = outputs[0]
+    if (!input || !input.length) {
+      return true
+    }
+
+    for (
+      let channel = 0;
+      channel < Math.min(input.length, this.recordChannelCount);
+      channel++
+    ) {
+      let inputChannel
       try {
         inputChannel = input[channel]
-        outputChannel = output[channel]
-        // outputChannel.set(inputChannel);
-
-        if (this.enable) channelsData[channel] = inputChannel.slice()
+        this.buffer[channel].push(...inputChannel.slice())
       } catch (e) {
         error(e, { channel, inputs, outputs, input, output })
       }
     }
+    
+    if (this.buffer[0].length >= this.reportSize) {
+      const recordBuffer = []
+      for (let channel = 0; channel < this.buffer.length; channel++) {
+        const floats = this.buffer[channel].slice(0, this.reportSize)
+        recordBuffer[channel] = new Float32Array(floats)
+        this.buffer[channel].splice(0, this.reportSize)
+        // log(
+        //   `channel ${channel}: report ${recordBuffer[channel].length}, remain ${this.buffer[channel].length}`
+        // )
+      }
 
-    if (this.enable) {
-      this.port.postMessage({
-        currentFrame,
-        sampleRate,
-        recordBuffer: channelsData.map((floats) => new Float32Array(floats)),
-      })
+      this.port.postMessage({ currentFrame, sampleRate, recordBuffer })
     }
 
     /**

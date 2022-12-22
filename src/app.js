@@ -31,7 +31,7 @@ function startRecording() {
       mediaStream: stream,
     })
     const worklet = new AudioWorkletNode(context, 'recorder-processor', {
-      processorOptions: { channelCount: 2 },
+      processorOptions: { channelCount: 1, reportSize: 3072 },
     })
     worklet.onprocessorerror = console.trace
     worklet.port.onmessage = async (e) => {
