@@ -119,6 +119,13 @@ void RealtimeSttWhisper::Run()
   wparams.max_tokens = 64;
   wparams.language = "en";
 
+  /**
+   * Experimental optimization: Reduce audio_ctx to 15s (half of the chunk
+   * size whisper is designed for) to speed up 2x.
+   * https://github.com/ggerganov/whisper.cpp/issues/137#issuecomment-1318412267
+   */
+  wparams.audio_ctx = 750;
+
   /* When more than this amount of audio received, run an iteration. */
   const int trigger_ms = 400;
   const int n_samples_trigger = (trigger_ms / 1000.0) * WHISPER_SAMPLE_RATE;
