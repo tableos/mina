@@ -134,7 +134,9 @@ void RealtimeSttWhisper::Run()
    * force finalize current audio context and clear the buffer. Note that
    * VAD may finalize an iteration earlier.
    */
-  const int iter_threshold_ms = 16000;
+  // This is recommended to be smaller than the time wparams.audio_ctx
+  // represents so an iteration can fit in one chunk.
+  const int iter_threshold_ms = trigger_ms * 35;
   const int n_samples_iter_threshold = (iter_threshold_ms / 1000.0) * WHISPER_SAMPLE_RATE;
 
   /**
@@ -149,10 +151,14 @@ void RealtimeSttWhisper::Run()
    */
 
   /* VAD parameters */
-  const int vad_window_s = 3;  // the last 3s
+  // The most recent 3s.
+  const int vad_window_s = 3;
   const int n_samples_vad_window = WHISPER_SAMPLE_RATE * vad_window_s;
-  const int vad_last_ms = 450;  // will compare the energy of the last 450ms to that of the total 3s
-  const int n_samples_keep_iter = WHISPER_SAMPLE_RATE * 0.1;
+  // In VAD, compare the energy of the last 450ms to that of the total 3s.
+  const int vad_last_ms = 450;
+  // Keep the last 0.2s of an iteration to the next one for better
+  // transcription at begin/end.
+  const int n_samples_keep_iter = WHISPER_SAMPLE_RATE * 0.2;
   const float vad_thold = 0.25f;
   const float freq_thold = 200.0f;
 
@@ -209,13 +215,12 @@ void RealtimeSttWhisper::Run()
         msg.text += text;
       }
 
-
       /**
        * Simple VAD from the "stream" example in whisper.cpp
        * https://github.com/ggerganov/whisper.cpp/blob/231bebca7deaf32d268a8b207d15aa859e52dbbe/examples/stream/stream.cpp#L378
        */
       bool speech_has_end = false;
-      
+
       /* Need enough accumulated audio to do VAD. */
       if ((int)pcmf32.size() >= n_samples_vad_window) {
         std::vector<float> pcmf32_window(pcmf32.end() - n_samples_vad_window, pcmf32.end());
