@@ -225,7 +225,7 @@ void RealtimeSttWhisper::Run()
       if (pcmf32.size() > n_samples_iter_threshold || speech_has_end) {
         const auto t_now = std::chrono::high_resolution_clock::now();
         const auto t_diff = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last_iter).count();
-        printf("iter took: %lldms\n", t_diff);
+        printf("iter took: %ldms\n", t_diff);
         t_last_iter = t_now;
 
         msg.is_partial = false;
