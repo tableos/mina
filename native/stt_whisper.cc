@@ -159,7 +159,7 @@ void RealtimeSttWhisper::Run()
   // Keep the last 0.2s of an iteration to the next one for better
   // transcription at begin/end.
   const int n_samples_keep_iter = WHISPER_SAMPLE_RATE * 0.2;
-  const float vad_thold = 0.25f;
+  const float vad_thold = 0.3f;
   const float freq_thold = 200.0f;
 
   /* Audio buffer */
