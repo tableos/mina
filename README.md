@@ -16,4 +16,4 @@ cd mina
 
 * `npm run build` to compile C/C++ code in `<project_root_dir>/native/`.
 * `npm run build-verbose` to see the actual command `node-gyp` is executing to compile C/C++ code. Useful when you want to check whether compiler flags are set correctly.
-* `git submodule update --remote whisper.cpp` to update whisper.cpp (?)
+* `git submodule update --remote whisper.cpp` to update whisper.cpp
