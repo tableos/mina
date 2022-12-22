@@ -67,6 +67,10 @@
     "variant": "cpp",
     "vector": "cpp",
     "algorithm": "cpp",
-    "binding.gyp": "json"
+    "binding.gyp": "json",
+    "functional": "cpp",
+    "numeric": "cpp",
+    "random": "cpp",
+    "regex": "cpp"
   }
 }
