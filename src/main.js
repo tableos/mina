@@ -23,7 +23,7 @@ const createWindow = () => {
 app.whenReady().then(() => {
   const kModelFile = path.join(
     __dirname,
-    '../whisper.cpp/models/ggml-tiny.en.bin'
+    '../whisper.cpp/models/ggml-base.en.bin'
   )
   if (!fs.existsSync(kModelFile)) {
     console.error('Cannot find whisper model file. Abort.')
