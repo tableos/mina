@@ -115,9 +115,12 @@ void RealtimeSttWhisper::Run()
   wparams.no_context = true;
   wparams.single_segment = true;
   wparams.print_progress = false;
+  wparams.print_realtime = false;
+  wparams.print_special = false;
   wparams.print_timestamps = false;
   wparams.max_tokens = 64;
   wparams.language = "en";
+  wparams.translate = false;
 
   /**
    * Experimental optimization: Reduce audio_ctx to 15s (half of the chunk
