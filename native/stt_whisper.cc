@@ -154,11 +154,11 @@ void RealtimeSttWhisper::Run()
   // The most recent 3s.
   const int vad_window_s = 3;
   const int n_samples_vad_window = WHISPER_SAMPLE_RATE * vad_window_s;
-  // In VAD, compare the energy of the last 450ms to that of the total 3s.
-  const int vad_last_ms = 450;
-  // Keep the last 0.2s of an iteration to the next one for better
+  // In VAD, compare the energy of the last 500ms to that of the total 3s.
+  const int vad_last_ms = 500;
+  // Keep the last 0.5s of an iteration to the next one for better
   // transcription at begin/end.
-  const int n_samples_keep_iter = WHISPER_SAMPLE_RATE * 0.2;
+  const int n_samples_keep_iter = WHISPER_SAMPLE_RATE * 0.5;
   const float vad_thold = 0.3f;
   const float freq_thold = 200.0f;
 
