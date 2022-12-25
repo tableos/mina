@@ -70,9 +70,8 @@ const textUpdateInterval = setInterval(async () => {
       }
       texts.append(text)
     } else {
-      if (msg.isPartial) {
-        lastText.innerText = msg.text
-      } else {
+      lastText.innerText = msg.text
+      if (!msg.isPartial) {
         lastText.style.color = 'black'
         lastText.dataset.partial = 'false'
       }
