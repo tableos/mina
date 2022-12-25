@@ -127,7 +127,7 @@ void RealtimeSttWhisper::Run()
    * size whisper is designed for) to speed up 2x.
    * https://github.com/ggerganov/whisper.cpp/issues/137#issuecomment-1318412267
    */
-  wparams.audio_ctx = 750;
+  wparams.audio_ctx = 768;
 
   /* When more than this amount of audio received, run an iteration. */
   const int trigger_ms = 400;
