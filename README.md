@@ -11,6 +11,11 @@ cd mina
 * `npm run test` to run the real-time stt engine with a recorded speech clip.
   * It will keep running after the clip is transcribed, hit `Ctrl-C` to stop.
 * `npm start` to start the electron app. It will listen to your default input device and transcribe anything it records.
+* **On macOS**, If the audio is choppy when this app is running, try restarting the audio stack with
+
+  ```bash
+  sudo launchctl kickstart -kp system/com.apple.audio.coreaudiod
+  ```
 
 ### Development
 
